@@ -1,3 +1,3 @@
 
-rootProject.name = "kinference_dot"
+rootProject.name = "kinference_play"
 
