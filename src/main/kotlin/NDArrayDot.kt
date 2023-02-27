@@ -1,5 +1,5 @@
-import io.kinference.ndarray.arrays.DoubleNDArray
-import io.kinference.ndarray.arrays.MutableDoubleNDArray
+import io.kinference.ndarray.arrays.FloatNDArray
+import io.kinference.ndarray.arrays.MutableFloatNDArray
 import kotlin.math.min
 
 // The new algorithms are kind of sketches, just to get the idea and see the benchmarks.
@@ -11,17 +11,17 @@ object NDArrayDot {
     However, it goes with directly indexing the source arrays, which requires a lot of arithmetic operations,
     so this implementation is actually slow. More than that, it is totally unreadable.
      */
-    fun new(a: DoubleNDArray, b: DoubleNDArray, c: MutableDoubleNDArray) {
+    fun new(a: FloatNDArray, b: FloatNDArray, c: MutableFloatNDArray) {
         val m = a.shape[0]
         val t = b.shape[0]
         val n = b.shape[1]
 
         val PAGE_BYTES = 4 * 1024
-        val PAGE_DOUBLES = PAGE_BYTES / Double.SIZE_BYTES
+        val PAGE_FLOATS = PAGE_BYTES / Float.SIZE_BYTES
 
         val mts: Int
         val tts: Int
-        val nts = PAGE_DOUBLES // 512
+        val nts = PAGE_FLOATS // 1024
 
         // these numbers are carefully calculated, with the implication of L2 cache being at least 256 KiB (mostly true)
         if (m / t >= 10) {
@@ -108,21 +108,21 @@ object NDArrayDot {
     This function allocates new matrices, that are stored by whole rows, then it applies the best algorithm for it.
     However, when either of matrices is large horizontally, allocation of large arrays consumes quite a lot of time.
      */
-    fun copy(a: DoubleNDArray, b: DoubleNDArray, c_: MutableDoubleNDArray) {
-        val a = a.toDoubleArray()
-        val b = b.toDoubleArray()
-        val c = Array(a.size) { DoubleArray(b[0].size) }
+    fun copy(a: FloatNDArray, b: FloatNDArray, c_: MutableFloatNDArray) {
+        val a = a.toFloatArray()
+        val b = b.toFloatArray()
+        val c = Array(a.size) { FloatArray(b[0].size) }
 
         val m = a.size
         val t = b.size
         val n = b[0].size
 
         val PAGE_BYTES = 4 * 1024
-        val PAGE_DOUBLES = PAGE_BYTES / Double.SIZE_BYTES
+        val PAGE_FLOATS = PAGE_BYTES / Float.SIZE_BYTES
 
         val mts: Int
         val tts: Int
-        val nts = PAGE_DOUBLES // 512
+        val nts = PAGE_FLOATS // 1024
 
         // these numbers are carefully calculated, with the implication of L2 cache being at least 256 KiB (mostly true)
         if (m / t >= 10) {
@@ -173,17 +173,17 @@ object NDArrayDot {
     [old] function on 4096x4096x4096. However, in some cases the old approach works good enough, so that this function
     sometimes fails to overcome the allocation&copying overhead. See comments in benchmarks.
      */
-    fun resize(a_: DoubleNDArray, b_: DoubleNDArray, c_: MutableDoubleNDArray) {
+    fun resize(a_: FloatNDArray, b_: FloatNDArray, c_: MutableFloatNDArray) {
         val m = a_.shape[0]
         val t = b_.shape[0]
         val n = b_.shape[1]
 
         val PAGE_BYTES = 4 * 1024
-        val PAGE_DOUBLES = PAGE_BYTES / Double.SIZE_BYTES
+        val PAGE_FLOATS = PAGE_BYTES / Float.SIZE_BYTES
 
         val mts: Int
         val tts: Int
-        val nts = PAGE_DOUBLES // 512
+        val nts = PAGE_FLOATS // 1024
 
         // these numbers are carefully calculated, with the implication of L2 cache being at least 256 KiB (mostly true)
         if (m / t >= 10) {
@@ -245,12 +245,12 @@ object NDArrayDot {
     }
 
 
-    fun old(a: DoubleNDArray, b: DoubleNDArray, c: MutableDoubleNDArray) {
+    fun old(a: FloatNDArray, b: FloatNDArray, c: MutableFloatNDArray) {
 //        a.dot(b, c, EmptyCoroutineContext)
 
         require(a.shape.size in 1..2 && b.shape.size in 1..2)
-        val actualThis = (if (a.shape.size == 1) a.reshape(intArrayOf(1, a.shape[0])) else a) as DoubleNDArray
-        val actualOther = (if (b.shape.size == 1) b.reshape(intArrayOf(1, b.shape[0])) else b) as DoubleNDArray
+        val actualThis = (if (a.shape.size == 1) a.reshape(intArrayOf(1, a.shape[0])) else a) as FloatNDArray
+        val actualOther = (if (b.shape.size == 1) b.reshape(intArrayOf(1, b.shape[0])) else b) as FloatNDArray
 
         require(actualThis.shape[1] == actualOther.shape[0])
 
@@ -289,7 +289,7 @@ object NDArrayDot {
                         val rightBlock = actualOther.array.blocks[(rightBlockOffset + k) * rdBlocksInRow + rdCol]
 
                         for (j in 0 until rdBlockSize) {
-                            destBlock[j] = (destBlock[j] + temp * rightBlock[j]).toDouble()
+                            destBlock[j] = (destBlock[j] + temp * rightBlock[j]).toFloat()
                         }
                     }
                 }

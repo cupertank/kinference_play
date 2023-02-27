@@ -1,5 +1,6 @@
-import io.kinference.ndarray.arrays.DoubleNDArray
-import io.kinference.ndarray.arrays.MutableDoubleNDArray
+import io.kinference.ndarray.arrays.FloatNDArray
+import io.kinference.ndarray.arrays.MutableFloatNDArray
+import io.kinference.ndarray.toFloatArray
 import java.util.*
 import kotlin.streams.asSequence
 import kotlin.streams.asStream
@@ -16,24 +17,24 @@ class NDArrayDotTest {
     @Test
     fun test_resize() = test(NDArrayDot::resize)
 
-    private fun test(matmul: (DoubleNDArray, DoubleNDArray, MutableDoubleNDArray) -> Unit) {
+    private fun test(matmul: (FloatNDArray, FloatNDArray, MutableFloatNDArray) -> Unit) {
         for ((caseName, a, b, expected) in cases) {
             val c = zeroesOfShape(expected.shape[0], expected.shape[1])
             matmul(a, b, c)
-            assertDeepEquals(expected.toDoubleArray(), c.toDoubleArray(), case = caseName)
+            assertDeepEquals(expected.toFloatArray(), c.toFloatArray(), case = caseName)
         }
     }
 
-    private fun zeroesOfShape(m: Int, n: Int): MutableDoubleNDArray {
+    private fun zeroesOfShape(m: Int, n: Int): MutableFloatNDArray {
         return (0 until m)
-            .map { (0 until n).map { 0.0 }.toDoubleArray() }
+            .map { (0 until n).map { 0.0 }.toFloatArray() }
             .toTypedArray().toNDArray().copyIfNotMutable()
     }
 
     private fun assertDeepEquals(
-        expected: Array<DoubleArray>,
-        c: Array<DoubleArray>,
-        tolerance: Double = 1e-6,
+        expected: Array<FloatArray>,
+        c: Array<FloatArray>,
+        tolerance: Float = 1e-3f,
         case: String
     ) {
         assertEquals(expected.size, c.size)
@@ -49,9 +50,9 @@ class NDArrayDotTest {
 
     private data class Case(
         val name: String,
-        val a: DoubleNDArray,
-        val b: DoubleNDArray,
-        val expected: DoubleNDArray,
+        val a: FloatNDArray,
+        val b: FloatNDArray,
+        val expected: FloatNDArray,
     ) {
         init {
             require(a.shape[0] == expected.shape[0])
@@ -67,19 +68,19 @@ class NDArrayDotTest {
     private val case_3x3x3_hardcoded = Case(
         "3x3 x 3x3 hardcoded",
         a = arrayOf(
-            doubleArrayOf(0.5, 1.1, 2.3),
-            doubleArrayOf(2.2, 3.3, 4.5),
-            doubleArrayOf(1.5, 4.9, 3.5),
+            floatArrayOf(0.5f, 1.1f, 2.3f),
+            floatArrayOf(2.2f, 3.3f, 4.5f),
+            floatArrayOf(1.5f, 4.9f, 3.5f),
         ).toNDArray(),
         b = arrayOf(
-            doubleArrayOf(1.7, 3.2, 8.3),
-            doubleArrayOf(8.2, 9.2, 1.3),
-            doubleArrayOf(2.4, 6.2, 0.3),
+            floatArrayOf(1.7f, 3.2f, 8.3f),
+            floatArrayOf(8.2f, 9.2f, 1.3f),
+            floatArrayOf(2.4f, 6.2f, 0.3f),
         ).toNDArray(),
         expected = arrayOf(
-            doubleArrayOf(15.39, 25.98, 6.27),
-            doubleArrayOf(41.6, 65.3, 23.9),
-            doubleArrayOf(51.13, 71.58, 19.87),
+            floatArrayOf(15.39f, 25.98f, 6.27f),
+            floatArrayOf(41.6f, 65.3f, 23.9f),
+            floatArrayOf(51.13f, 71.58f, 19.87f),
         ).toNDArray()
     )
 
@@ -102,12 +103,12 @@ class NDArrayDotTest {
     private fun generateRandom(m: Int, t: Int, n: Int, seed: Long = Random().nextLong(), name: String): Case {
         val random = Random(seed)
 
-        fun randomArray(m: Int, n: Int): Array<DoubleArray> {
+        fun randomArray(m: Int, n: Int): Array<FloatArray> {
             return random.doubles()
                 .limit(m.toLong() * n)
                 .asSequence()
                 .chunked(n)
-                .map { it.toDoubleArray() }
+                .map { it.toFloatArray() }
                 .toList()
                 .toTypedArray()
         }
@@ -120,8 +121,8 @@ class NDArrayDotTest {
             .map { i -> (0 until n).map { i to it } }
             .asStream().parallel()
             .map { row ->
-                row.map { (i, j) -> (0 until t).sumOf { a[i][it] * b[it][j] } }
-                    .toDoubleArray()
+                row.map { (i, j) -> (0 until t).sumOf { a[i][it] * b[it][j].toDouble() } }
+                    .toFloatArray()
             }
             .toList().toTypedArray()
 

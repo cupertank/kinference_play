@@ -1,8 +1,8 @@
 package com.boris
 
 import NDArrayDot
-import io.kinference.ndarray.arrays.DoubleNDArray
-import io.kinference.ndarray.arrays.MutableDoubleNDArray
+import io.kinference.ndarray.arrays.FloatNDArray
+import io.kinference.ndarray.arrays.MutableFloatNDArray
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import toNDArray
@@ -12,13 +12,13 @@ import java.util.*
 @Suppress("unused")
 @State(Scope.Benchmark)
 open class NDArrayDotBench {
-    private lateinit var a: DoubleNDArray
-    private lateinit var b: DoubleNDArray
-    private lateinit var c: MutableDoubleNDArray
+    private lateinit var a: FloatNDArray
+    private lateinit var b: FloatNDArray
+    private lateinit var c: MutableFloatNDArray
 
     @Setup(Level.Iteration)
     fun init() {
-        val (a, b) = generateRandom(1024, 1024, 1024, seed = 42)
+//        val (a, b) = generateRandom(1024, 1024, 1024, seed = 42)
 
         // slowest, may take 50 minutes, but is best in showing the speed-up of the new algo
 //        val (a, b) = generateRandom(4096, 4096, 4096, seed = 42)
@@ -36,7 +36,7 @@ open class NDArrayDotBench {
 //        val (a, b) = generateRandom(1024, 4096, 256, seed = 42)
 //        val (a, b) = generateRandom(2048, 2048*4, 2048/4, seed = 42)
 //        val (a, b) = generateRandom(1024 * 64, 256, 64, seed = 42)
-//        val (a, b) = generateRandom(4096 * 64, 256, 64, seed = 42)
+        val (a, b) = generateRandom(4096 * 64, 256, 64, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 16, 64, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 32, 16, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 128, 4, seed = 42)
@@ -56,7 +56,7 @@ open class NDArrayDotBench {
 //        val (a, b) = generateRandom(2, 256 * 16, 2, seed = 42)
         this.a = a.toNDArray()
         this.b = b.toNDArray()
-        this.c = Array(a.size) { DoubleArray(b[0].size) }.toNDArray()
+        this.c = Array(a.size) { FloatArray(b[0].size) }.toNDArray()
     }
 
     @Benchmark
@@ -82,22 +82,22 @@ open class NDArrayDotBench {
         t: Int,
         n: Int,
         seed: Long = Random().nextLong()
-    ): Pair<Array<DoubleArray>, Array<DoubleArray>> {
+    ): Pair<Array<FloatArray>, Array<FloatArray>> {
         val random = Random(seed)
 
-//        fun randomArray(m: Int, n: Int): Array<DoubleArray> {
-//            return random.doubles()
+//        fun randomArray(m: Int, n: Int): Array<FloatArray> {
+//            return random.Floats()
 //                .limit(m.toLong() * n)
 //                .asSequence()
 //                .chunked(n)
-//                .map { it.toDoubleArray() }
+//                .map { it.toFloatArray() }
 //                .toList()
 //                .toTypedArray()
 //        }
 
-        fun randomArray(m: Int, n: Int): Array<DoubleArray> {
+        fun randomArray(m: Int, n: Int): Array<FloatArray> {
             return Array(m) {
-                random.doubles().limit(n.toLong()).toArray()
+                random.doubles().limit(n.toLong()).toArray().map { it.toFloat() }.toFloatArray()
             }
         }
 

@@ -1,23 +1,23 @@
-import io.kinference.ndarray.arrays.DoubleNDArray
-import io.kinference.ndarray.arrays.MutableDoubleNDArray
+import io.kinference.ndarray.arrays.FloatNDArray
+import io.kinference.ndarray.arrays.MutableFloatNDArray
 
-fun Array<DoubleArray>.toNDArray(): MutableDoubleNDArray {
-    val result = MutableDoubleNDArray(intArrayOf(this.size, this[0].size))
+fun Array<FloatArray>.toNDArray(): MutableFloatNDArray {
+    val result = MutableFloatNDArray(intArrayOf(this.size, this[0].size))
     copyBlocks(this, result.array.blocks)
     return result
-//    return MutableDoubleNDArray(intArrayOf(this.size, this[0].size)) {
+//    return MutableFloatNDArray(intArrayOf(this.size, this[0].size)) {
 //        this[it / this[0].size][it % this[0].size]
 //    }
 }
 
-fun DoubleNDArray.toDoubleArray(): Array<DoubleArray> {
+fun FloatNDArray.toFloatArray(): Array<FloatArray> {
     val (result, _) = emptyBlocks(shape, blockSize = shape[1])
     copyBlocks(array.blocks, result)
     return result
 //    val blocksInRow = array.blocksNum / shape[0]
 //    val blockSize = array.blockSize
 //    return Array(shape[0]) { i ->
-//        val row = DoubleArray(shape[1])
+//        val row = FloatArray(shape[1])
 //        for (block in i * blocksInRow until (i + 1) * blocksInRow) {
 //            array.blocks[block].copyInto(row, (block - i * blocksInRow) * blockSize)
 //        }
@@ -25,7 +25,7 @@ fun DoubleNDArray.toDoubleArray(): Array<DoubleArray> {
 //    }
 }
 
-fun emptyBlocks(shape: IntArray, blockSize: Int): Pair<Array<DoubleArray>, Int> {
+fun emptyBlocks(shape: IntArray, blockSize: Int): Pair<Array<FloatArray>, Int> {
     val blocksInRow: Int
     val lastBlockSize: Int
 
@@ -39,12 +39,12 @@ fun emptyBlocks(shape: IntArray, blockSize: Int): Pair<Array<DoubleArray>, Int> 
 
     val array = Array(shape[0] * blocksInRow) { blockI ->
         val actualBlockSize = if ((blockI + 1) % blocksInRow == 0) lastBlockSize else blockSize
-        DoubleArray(actualBlockSize)
+        FloatArray(actualBlockSize)
     }
     return array to blocksInRow
 }
 
-fun copyBlocks(srcBlocks: Array<DoubleArray>, dstBlocks: Array<DoubleArray>) {
+fun copyBlocks(srcBlocks: Array<FloatArray>, dstBlocks: Array<FloatArray>) {
     if (srcBlocks === dstBlocks) {
         return
     }
