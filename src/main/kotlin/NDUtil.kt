@@ -1,5 +1,7 @@
 import io.kinference.ndarray.arrays.FloatNDArray
 import io.kinference.ndarray.arrays.MutableFloatNDArray
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 fun Array<FloatArray>.toNDArray(): MutableFloatNDArray {
     val result = MutableFloatNDArray(intArrayOf(this.size, this[0].size))
@@ -81,3 +83,12 @@ fun copyBlocks(srcBlocks: Array<FloatArray>, dstBlocks: Array<FloatArray>) {
         }
     }
 }
+
+suspend fun copyBlocks(srcBlocksBatch: Sequence<Array<FloatArray>>, dstBlocksBatch: Sequence<Array<FloatArray>>) = coroutineScope {
+    for ((srcBlocks, dstBlocks) in srcBlocksBatch.zip(dstBlocksBatch)) {
+        launch {
+            copyBlocks(srcBlocks, dstBlocks)
+        }
+    }
+}
+

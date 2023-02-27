@@ -1,5 +1,7 @@
 import io.kinference.ndarray.arrays.FloatNDArray
 import io.kinference.ndarray.arrays.MutableFloatNDArray
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlin.math.min
 
 // The new algorithms are kind of sketches, just to get the idea and see the benchmarks.
@@ -11,7 +13,7 @@ object NDArrayDot {
     However, it goes with directly indexing the source arrays, which requires a lot of arithmetic operations,
     so this implementation is actually slow. More than that, it is totally unreadable.
      */
-    fun new(a: FloatNDArray, b: FloatNDArray, c: MutableFloatNDArray) {
+    suspend fun new(a: FloatNDArray, b: FloatNDArray, c: MutableFloatNDArray) {
         val m = a.shape[0]
         val t = b.shape[0]
         val n = b.shape[1]
@@ -108,7 +110,7 @@ object NDArrayDot {
     This function allocates new matrices, that are stored by whole rows, then it applies the best algorithm for it.
     However, when either of matrices is large horizontally, allocation of large arrays consumes quite a lot of time.
      */
-    fun copy(a: FloatNDArray, b: FloatNDArray, c_: MutableFloatNDArray) {
+    suspend fun copy(a: FloatNDArray, b: FloatNDArray, c_: MutableFloatNDArray) {
         val a = a.toFloatArray()
         val b = b.toFloatArray()
         val c = Array(a.size) { FloatArray(b[0].size) }
@@ -173,7 +175,7 @@ object NDArrayDot {
     [old] function on 4096x4096x4096. However, in some cases the old approach works good enough, so that this function
     sometimes fails to overcome the allocation&copying overhead. See comments in benchmarks.
      */
-    fun resize(a_: FloatNDArray, b_: FloatNDArray, c_: MutableFloatNDArray) {
+    suspend fun resize(a_: FloatNDArray, b_: FloatNDArray, c_: MutableFloatNDArray) {
         val m = a_.shape[0]
         val t = b_.shape[0]
         val n = b_.shape[1]
@@ -245,7 +247,7 @@ object NDArrayDot {
     }
 
 
-    fun old(a: FloatNDArray, b: FloatNDArray, c: MutableFloatNDArray) {
+    suspend fun old(a: FloatNDArray, b: FloatNDArray, c: MutableFloatNDArray) {
 //        a.dot(b, c, EmptyCoroutineContext)
 
         require(a.shape.size in 1..2 && b.shape.size in 1..2)
@@ -290,6 +292,221 @@ object NDArrayDot {
 
                         for (j in 0 until rdBlockSize) {
                             destBlock[j] = (destBlock[j] + temp * rightBlock[j]).toFloat()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun resize_parallel(a_: FloatNDArray, b_: FloatNDArray, c_: MutableFloatNDArray) {
+        val m = a_.shape[0]
+        val t = b_.shape[0]
+        val n = b_.shape[1]
+
+        val PAGE_BYTES = 4 * 1024
+        val PAGE_FLOATS = PAGE_BYTES / Float.SIZE_BYTES
+
+        val mts: Int
+        val tts: Int
+        val nts = PAGE_FLOATS // 1024
+
+        // these numbers are carefully calculated, with the implication of L2 cache being at least 256 KiB (mostly true)
+        if (m / t >= 10) {
+            mts = 256
+            tts = 24
+        } else {
+            mts = 24
+            tts = 30
+        }
+
+        val (a, aBlocksInRow) = if (a_.array.blockSize > tts) {
+            emptyBlocks(a_.shape, blockSize = tts)
+        } else {
+            a_.array.blocks to (a_.shape[1] / a_.array.blockSize)
+        }
+        val aBlockSize = a[0].size
+
+        val (b, bBlocksInRow) = if (b_.array.blockSize > nts) {
+            emptyBlocks(b_.shape, blockSize = nts)
+        } else {
+            b_.array.blocks to (b_.shape[1] / b_.array.blockSize)
+        }
+        val bBlockSize = b[0].size
+
+        val c = if (c_.array.blockSize > nts) {
+            emptyBlocks(c_.shape, blockSize = nts).first
+        } else {
+            c_.array.blocks
+        }
+
+        copyBlocks(a_.array.blocks.asSequence().chunked(a_.shape[1] / a_.array.blockSize) { it.toTypedArray() }, a.asSequence().chunked(aBlocksInRow) { it.toTypedArray() })
+        copyBlocks(b_.array.blocks.asSequence().chunked(b_.shape[1] / b_.array.blockSize) { it.toTypedArray() }, b.asSequence().chunked(bBlocksInRow) { it.toTypedArray() })
+
+        coroutineScope {
+            for (it in 0 until m step mts) {
+                val ie = min(it, m - mts) + mts
+                for (jt in 0 until bBlocksInRow) launch {
+                    for (kt in 0 until aBlocksInRow) {
+                        for (i in it until ie) {
+                            val ci = c[i * bBlocksInRow + jt]
+                            val ai = a[i * aBlocksInRow + kt]
+                            for (k in ai.indices) {
+                                val bk = b[(kt * aBlockSize + k) * bBlocksInRow + jt]
+                                val aik = ai[k]
+                                for (j in ci.indices) {
+                                    ci[j] += aik * bk[j]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        copyBlocks(c.asSequence().chunked(bBlocksInRow) { it.toTypedArray() }, c_.array.blocks.asSequence().chunked(a_.shape[1] / a_.array.blockSize) { it.toTypedArray() })
+    }
+
+    suspend fun resize_parallel_lesslaunches(a_: FloatNDArray, b_: FloatNDArray, c_: MutableFloatNDArray) {
+        val m = a_.shape[0]
+        val t = b_.shape[0]
+        val n = b_.shape[1]
+
+        val PAGE_BYTES = 4 * 1024
+        val PAGE_FLOATS = PAGE_BYTES / Float.SIZE_BYTES
+
+        val mts: Int
+        val tts: Int
+        val nts = PAGE_FLOATS // 1024
+
+        // these numbers are carefully calculated, with the implication of L2 cache being at least 256 KiB (mostly true)
+        if (m / t >= 10) {
+            mts = 256
+            tts = 24
+        } else {
+            mts = 24
+            tts = 30
+        }
+
+        val (a, aBlocksInRow) = if (a_.array.blockSize > tts) {
+            emptyBlocks(a_.shape, blockSize = tts)
+        } else {
+            a_.array.blocks to (a_.shape[1] / a_.array.blockSize)
+        }
+        val aBlockSize = a[0].size
+
+        val (b, bBlocksInRow) = if (b_.array.blockSize > nts) {
+            emptyBlocks(b_.shape, blockSize = nts)
+        } else {
+            b_.array.blocks to (b_.shape[1] / b_.array.blockSize)
+        }
+        val bBlockSize = b[0].size
+
+        val c = if (c_.array.blockSize > nts) {
+            emptyBlocks(c_.shape, blockSize = nts).first
+        } else {
+            c_.array.blocks
+        }
+
+
+//        val (a, aBlocksInRow) = emptyBlocks(a_.shape, blockSize = tts)
+//        val (b, bBlocksInRow) = emptyBlocks(b_.shape, blockSize = nts)
+//        val (c, _) = emptyBlocks(c_.shape, blockSize = nts)
+
+        copyBlocks(a_.array.blocks.asSequence().chunked(a_.shape[1] / a_.array.blockSize) { it.toTypedArray() }, a.asSequence().chunked(aBlocksInRow) { it.toTypedArray() })
+        copyBlocks(b_.array.blocks.asSequence().chunked(b_.shape[1] / b_.array.blockSize) { it.toTypedArray() }, b.asSequence().chunked(bBlocksInRow) { it.toTypedArray() })
+
+        val cores = Runtime.getRuntime().availableProcessors()
+        val mTiles = (m + mts - 1) / mts
+        val nTiles = bBlocksInRow
+        val mParallelChunks = 1 + cores * mTiles / (mTiles + nTiles)
+        val nParallelChunks = (cores + mParallelChunks - 1) / mParallelChunks
+        val mTilesPerChunk = (mTiles + mParallelChunks - 1) / mParallelChunks
+        val nTilesPerChunk = (nTiles + nParallelChunks - 1) / nParallelChunks
+        val mChunkSize = mts * mTilesPerChunk
+
+        coroutineScope {
+            for (ic in 0 until m step mChunkSize) {
+                for (jc in 0 until nTiles step nTilesPerChunk) {
+                    val jte = minOf(jc + nTilesPerChunk, nTiles)
+
+                    launch {
+                        for (it in ic until ic + mChunkSize step mts) {
+                            val ie = minOf(it, m - mts) + mts
+                            for (kt in 0 until aBlocksInRow) {
+                                for (jt in jc until jte) {
+
+                                    for (i in it until ie) {
+                                        val ci = c[i * bBlocksInRow + jt]
+                                        val ai = a[i * aBlocksInRow + kt]
+                                        for (k in ai.indices) {
+                                            val bk = b[(kt * aBlockSize + k) * bBlocksInRow + jt]
+                                            val aik = ai[k]
+                                            for (j in ci.indices) {
+                                                ci[j] += aik * bk[j]
+                                            }
+                                        }
+                                    }
+
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
+
+        copyBlocks(c.asSequence().chunked(bBlocksInRow) { it.toTypedArray() }, c_.array.blocks.asSequence().chunked(a_.shape[1] / a_.array.blockSize) { it.toTypedArray() })
+    }
+
+    suspend fun old_parallel(a: FloatNDArray, b: FloatNDArray, c: MutableFloatNDArray) = coroutineScope {
+//        a.dot(b, c, EmptyCoroutineContext)
+
+        require(a.shape.size in 1..2 && b.shape.size in 1..2)
+        val actualThis = (if (a.shape.size == 1) a.reshape(intArrayOf(1, a.shape[0])) else a) as FloatNDArray
+        val actualOther = (if (b.shape.size == 1) b.reshape(intArrayOf(1, b.shape[0])) else b) as FloatNDArray
+
+        require(actualThis.shape[1] == actualOther.shape[0])
+
+        val n = actualThis.shape[0]
+//        val t = actualThis.shape[1]
+
+        val lBlockSize = actualThis.array.blockSize
+        val rdBlockSize = c.array.blockSize
+
+        val lBlocksInRow = a.shape[1] / lBlockSize
+        val rdBlocksInRow = b.shape[1] / rdBlockSize
+
+        for (rdCol in 0 until rdBlocksInRow) {
+            launch {
+                for (i in 0 until n) {
+                    /*
+                    i * rdBlockInRow equals taking i-th line in destination matrix
+                    rdCol is number of current block in row
+                     */
+                    val destBlock = c.array.blocks[i * rdBlocksInRow + rdCol]
+                    //i * lBlocksInRow equals taking i-th line in left matrix
+                    val leftBlockOffset = i * lBlocksInRow
+                    // iterating over blocks in i-th line in left matrix
+                    for (lCol in 0 until lBlocksInRow) {
+                        val leftBlock = actualThis.array.blocks[leftBlockOffset + lCol]
+                        val rightBlockOffset = lCol * lBlockSize
+
+                        // iterating in left block
+                        for (k in 0 until lBlockSize) {
+                            val temp = leftBlock[k]
+                            /*
+                             * lCol * lBlockSize + k is linear index in row in left matrix
+                             * number temp staying at [i, lCol * lBlockSize + k] in left matrix,
+                             * therefore, we should take (lCol * lBlockSize + k) row in right matrix
+                             * (lCol * lBlockSize) moved in rightBlockOffset due to performance purposes
+                             */
+                            val rightBlock = actualOther.array.blocks[(rightBlockOffset + k) * rdBlocksInRow + rdCol]
+
+                            for (j in 0 until rdBlockSize) {
+                                destBlock[j] = (destBlock[j] + temp * rightBlock[j]).toFloat()
+                            }
                         }
                     }
                 }

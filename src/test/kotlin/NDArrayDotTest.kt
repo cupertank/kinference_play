@@ -1,7 +1,10 @@
 import io.kinference.ndarray.arrays.FloatNDArray
 import io.kinference.ndarray.arrays.MutableFloatNDArray
 import io.kinference.ndarray.toFloatArray
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import java.util.*
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.streams.asSequence
 import kotlin.streams.asStream
 import kotlin.test.Test
@@ -17,10 +20,19 @@ class NDArrayDotTest {
     @Test
     fun test_resize() = test(NDArrayDot::resize)
 
-    private fun test(matmul: (FloatNDArray, FloatNDArray, MutableFloatNDArray) -> Unit) {
+    @Test
+    fun test_resize_parallel() = test(NDArrayDot::resize_parallel)
+    @Test
+    fun test_resize_parallel_lesslaunches() = test(NDArrayDot::resize_parallel_lesslaunches)
+    @Test
+    fun test_old_parallel() = test(NDArrayDot::old_parallel)
+
+    private fun test(matmul: suspend (FloatNDArray, FloatNDArray, MutableFloatNDArray) -> Unit) {
         for ((caseName, a, b, expected) in cases) {
             val c = zeroesOfShape(expected.shape[0], expected.shape[1])
-            matmul(a, b, c)
+            runBlocking(Dispatchers.Default) {
+                matmul(a, b, c)
+            }
             assertDeepEquals(expected.toFloatArray(), c.toFloatArray(), case = caseName)
         }
     }

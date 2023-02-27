@@ -3,6 +3,8 @@ package com.boris
 import NDArrayDot
 import io.kinference.ndarray.arrays.FloatNDArray
 import io.kinference.ndarray.arrays.MutableFloatNDArray
+import io.kinference.utils.runBlocking
+import kotlinx.coroutines.Dispatchers
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import toNDArray
@@ -33,11 +35,13 @@ open class NDArrayDotBench {
         // this case shows that the overhead of copying is considerably small even in the worst possible case
 //        val (a, b) = generateRandom(1024 - 1, 16 * 16 - 1, 1024 * 64 - 1, seed = 42)
 
+        // this case also shows dramatic improvement
 //        val (a, b) = generateRandom(1024, 4096, 256, seed = 42)
 //        val (a, b) = generateRandom(2048, 2048*4, 2048/4, seed = 42)
 //        val (a, b) = generateRandom(1024 * 64, 256, 64, seed = 42)
-        val (a, b) = generateRandom(4096 * 64, 256, 64, seed = 42)
-//        val (a, b) = generateRandom(64, 1024 * 16, 64, seed = 42)
+//        val (a, b) = generateRandom(4096 * 64, 256, 64, seed = 42)
+        val (a, b) = generateRandom(64, 1024 * 16, 64, seed = 42)
+//        val (a, b) = generateRandom(64, 1024 * 32, 16, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 32, 16, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 128, 4, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 256, 2, seed = 42)
@@ -60,20 +64,34 @@ open class NDArrayDotBench {
     }
 
     @Benchmark
-    fun bench_old(bh: Blackhole) {
+    fun bench_old(bh: Blackhole) = runBlocking(Dispatchers.Default) {
         bh.consume(NDArrayDot.old(a, b, c))
     }
+//    @Benchmark
+//    fun bench_new(bh: Blackhole) = runBlocking(Dispatchers.Default) {
+//        bh.consume(NDArrayDot.new(a, b, c))
+//    }
+//    @Benchmark
+//    fun bench_copy(bh: Blackhole) = runBlocking(Dispatchers.Default) {
+//        bh.consume(NDArrayDot.copy(a, b, c))
+//    }
     @Benchmark
-    fun bench_new(bh: Blackhole) {
-        bh.consume(NDArrayDot.new(a, b, c))
-    }
-    @Benchmark
-    fun bench_copy(bh: Blackhole) {
-        bh.consume(NDArrayDot.copy(a, b, c))
-    }
-    @Benchmark
-    fun bench_resize(bh: Blackhole) {
+    fun bench_resize(bh: Blackhole) = runBlocking(Dispatchers.Default) {
         bh.consume(NDArrayDot.resize(a, b, c))
+    }
+
+
+    @Benchmark
+    fun bench_resize_parallel(bh: Blackhole) = runBlocking(Dispatchers.Default) {
+        bh.consume(NDArrayDot.resize_parallel(a, b, c))
+    }
+    @Benchmark
+    fun bench_resize_parallel_lesslaunches(bh: Blackhole) = runBlocking(Dispatchers.Default) {
+        bh.consume(NDArrayDot.resize_parallel_lesslaunches(a, b, c))
+    }
+    @Benchmark
+    fun bench_old_parallel(bh: Blackhole) = runBlocking(Dispatchers.Default) {
+        bh.consume(NDArrayDot.old_parallel(a, b, c))
     }
 
     @Suppress("SameParameterValue")
