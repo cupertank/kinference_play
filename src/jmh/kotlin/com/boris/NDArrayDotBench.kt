@@ -26,7 +26,7 @@ open class NDArrayDotBench {
 //        val (a, b) = generateRandom(4096, 4096, 4096, seed = 42)
 
 //        val (a, b) = generateRandom(1024, 64, 1024 * 16, seed = 42)
-//        val (a, b) = generateRandom(2048, 64, 2048*32, seed = 42)
+        val (a, b) = generateRandom(2048, 64, 2048*32, seed = 42)
 //        val (a, b) = generateRandom(1024, 16, 1024 * 64, seed = 42)
 
         // worst impact of array copying, bcz blockSize of the source is bad & old algorithm is also fast here
@@ -40,7 +40,7 @@ open class NDArrayDotBench {
 //        val (a, b) = generateRandom(2048, 2048*4, 2048/4, seed = 42)
 //        val (a, b) = generateRandom(1024 * 64, 256, 64, seed = 42)
 //        val (a, b) = generateRandom(4096 * 64, 256, 64, seed = 42)
-        val (a, b) = generateRandom(64, 1024 * 16, 64, seed = 42)
+//        val (a, b) = generateRandom(64, 1024 * 16, 64, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 32, 16, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 32, 16, seed = 42)
 //        val (a, b) = generateRandom(64, 1024 * 128, 4, seed = 42)
@@ -63,7 +63,7 @@ open class NDArrayDotBench {
         this.c = Array(a.size) { FloatArray(b[0].size) }.toNDArray()
     }
 
-    @Benchmark
+//    @Benchmark
     fun bench_old(bh: Blackhole) = runBlocking(Dispatchers.Default) {
         bh.consume(NDArrayDot.old(a, b, c))
     }
@@ -75,7 +75,7 @@ open class NDArrayDotBench {
 //    fun bench_copy(bh: Blackhole) = runBlocking(Dispatchers.Default) {
 //        bh.consume(NDArrayDot.copy(a, b, c))
 //    }
-    @Benchmark
+//    @Benchmark
     fun bench_resize(bh: Blackhole) = runBlocking(Dispatchers.Default) {
         bh.consume(NDArrayDot.resize(a, b, c))
     }
@@ -89,9 +89,14 @@ open class NDArrayDotBench {
     fun bench_resize_parallel_lesslaunches(bh: Blackhole) = runBlocking(Dispatchers.Default) {
         bh.consume(NDArrayDot.resize_parallel_lesslaunches(a, b, c))
     }
-    @Benchmark
+//    @Benchmark
     fun bench_old_parallel(bh: Blackhole) = runBlocking(Dispatchers.Default) {
         bh.consume(NDArrayDot.old_parallel(a, b, c))
+    }
+
+    @Benchmark
+    fun bench_cupertank(bh: Blackhole) = runBlocking(Dispatchers.Default) {
+        bh.consume(NDArrayDot.cupertankParallel(a, b, c))
     }
 
     @Suppress("SameParameterValue")

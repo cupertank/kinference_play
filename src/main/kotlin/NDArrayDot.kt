@@ -513,4 +513,57 @@ object NDArrayDot {
             }
         }
     }
+
+    suspend fun cupertankParallel(left: FloatNDArray, right: FloatNDArray, dest: MutableFloatNDArray) {
+        val n = left.shape[0]
+        val k = left.shape[1]
+        val m = right.shape[1]
+
+        val lBlockSize = left.array.blockSize
+        val rdBlockSize = right.array.blockSize
+
+        val lBlocksInRow = left.shape[1] / lBlockSize
+        val rdBlocksInRow = right.shape[1] / rdBlockSize
+
+        val threads = Runtime.getRuntime().availableProcessors()
+        val nStep = if (n < threads) 1 else n / threads
+
+        fun wrapper(nStart: Int, nEnd: Int) {
+            for (i in nStart until nEnd) {
+                val leftBlockOffset = i * lBlocksInRow
+                val destBlockOffset = i * rdBlocksInRow
+
+                for (lCol in 0 until lBlocksInRow) {
+                    val leftBlock = left.array.blocks[leftBlockOffset + lCol]
+                    val rightBlockOffset = lCol * lBlockSize
+
+                    for (k in 0 until lBlockSize) {
+                        val rightBlockOffsetFull = (rightBlockOffset + k) * rdBlocksInRow
+                        val temp = leftBlock[k]
+
+                        for (rdCol in 0 until rdBlocksInRow) {
+                            val destBlock = dest.array.blocks[destBlockOffset + rdCol]
+                            val rightBlock = right.array.blocks[rightBlockOffsetFull + rdCol]
+
+                            for (j in destBlock.indices) {
+                                destBlock[j] += temp * rightBlock[j]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (n != 1) {
+            coroutineScope {
+                for (nStart in 0 until n step nStep) {
+                    launch {
+                        wrapper(nStart, min(nStart + nStep, n))
+                    }
+                }
+            }
+        } else {
+            wrapper(0, n)
+        }
+    }
 }
